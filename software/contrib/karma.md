@@ -19,26 +19,34 @@ Delay, stretch, multiply, divide, and add a touch of randomness to your triggers
     output_2: Output mix of output_1 and output_3 (OR logic)
     output_5: Output mix of output_4 and output_6 (OR logic)
 
-    knob_1: Cycle through the settings of the selected output
-    knob_2: Change the value of the highlighted setting
+    knob_1: Cycle through output pages
+    knob_2: 
+      - If no setting is being edited: Cycle through the settings of the selected output
+      - If a setting is being edited: Change the setting value
 
     button_1:
-    - Short Press (<300ms) : Send a manual trigger/gate to trigger 1
-    - Long Press (>300ms) : Cycle back through output pages
+      - Short Press (<300ms) : Send a manual trigger/gate to trigger 1
+      - Middle Press (>300ms) : Cancel setting edit
 
     button_2:
-    - Short Press (<300ms) : Send a manual trigger/gate to trigger 2
-    - Long Press (>300ms) : Cycle through output pages
+      - Short Press (<300ms) : Send a manual trigger/gate to trigger 2
+      - Long Press (>300ms) : 
+        - If no setting is being edited: Select highlighted setting
+        - If a setting is being edited: Save currenly edited setting
 
 # Usage
 
 The settings are constantly displayed, there is no other output than the settings page.
+
+Both input are used as digital input, the analogue input might a bit less precise than the digital output since it hasn't been made to handle digital signals as well the digital input.
 
 ## Settings
 
 Use the Knob 1 to select a different setting to edit.
 
 Use the Knob 2 to change the value of the setting to edit that you've selected with the Knob 1.
+
+Use the buttons to the next / previous output settings.
 
 ### Beginning
 
@@ -114,3 +122,26 @@ Exactly the same as the probability setting but applied to the divisions.
 For instance, if an output is set to have 10 divisions and have a probability per division of 50%, it will most likely output only 5 divisions.
 
 Default: 100%.
+
+# Patch ideas
+
+## Mutable Instruments Rings
+
+I've made this script specifically to use it with MI Rings in my setup.
+
+My goal was to trigger burst of random triggers to Rings' strum input at specific steps of my sequence.
+
+## Self patching
+
+It can be interesting to self patch the module, sending one output of the first trigger input into the second input to have some sort of cascading effect.
+
+## Add probability to basic triggers
+
+This script can also be used to simply add probability to any trigger by using the following settings for instance:
+- Beginning: At start
+- Delay: 0ms
+- Duration: 10ms
+- Divisions: 1
+- Repetitions: 0
+- Probability: 50%
+- Probability per division: 100%

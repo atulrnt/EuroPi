@@ -42,7 +42,7 @@ class Karma(EuroPiScript):
         @b2.handler_falling
         def b2_pressed():
             if ticks_diff(ticks_ms(), b2.last_pressed()) > 300:
-                # Show next output settings
+                # Select / Save setting
                 pass
             else:
                 self.start_section(1)
