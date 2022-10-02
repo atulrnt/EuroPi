@@ -450,7 +450,13 @@ class Display(SSD1306_I2C):
             x_offset = int((self.width - ((len(content) + 1) * 7)) / 2) - 1
             y_offset = int((index * 9) + padding_top) - 1
             self.text(content, x_offset, y_offset)
-        oled.show()
+        self.show()
+
+    def arrow(self, y, x=2, direction='left', size=4, color=1):
+        """Display an arrow of the desired size and color pointing left or right"""
+        for i in range(size):
+            xi = x + i if direction == 'left' else self.width - x - i
+            self.line(xi, y - i, xi, y + i, color)
 
 
 class Output:
