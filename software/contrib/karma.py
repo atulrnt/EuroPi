@@ -59,6 +59,7 @@ class KarmaOutput:
         self._output_ended_at = None
         self._division_started_at = None
         self._occurrences = 0
+        self._division_occurrences = 0
 
     @property
     def beginning(self) -> int:
@@ -147,7 +148,7 @@ class KarmaOutput:
         if self._divisions == 1:
             return self._duration
 
-        return self._duration / ((self._divisions * 2) + 1)
+        return self._duration / (self._divisions * 2)
 
     def _start(self):
         if not self._can_output(self._probability):
@@ -157,10 +158,10 @@ class KarmaOutput:
 
     def _reset(self):
         self.output = LOW
-        self._occurrences = 0
         self._trigger_started_at = None
-        self._division_started_at = None
         self._output_started_at = None
+        self._division_started_at = None
+        self._division_occurrences = 0
 
     def start(self):
         self._reset()
@@ -180,42 +181,43 @@ class KarmaOutput:
         if not self._trigger_started_at:
             self.output = LOW
         else:
-            current_time = time.ticks_ms()
-
             # Start the output
-            if not self._output_started_at and time.ticks_diff(current_time, self._trigger_started_at) >= self._delay:
-                self._output_started_at = current_time
+            if not self._output_started_at and time.ticks_diff(time.ticks_ms(), self._trigger_started_at) >= self._delay:
+                self._output_started_at = time.ticks_ms()
 
             # End the karma run
-            elif self._output_started_at and time.ticks_diff(current_time, self._output_started_at) >= self._duration:
+            elif self._output_started_at and time.ticks_diff(time.ticks_ms(), self._output_started_at) >= self._duration:
                 if self._repetitions > 0 and self._occurrences < self._repetitions:
-                    if self._output_ended_at:
-                        self._output_ended_at = current_time
-                    elif time.ticks_diff(current_time, self._output_ended_at) >= self._duration:
+                    if not self._output_ended_at:
+                        self._output_ended_at = time.ticks_ms()
+                    elif time.ticks_diff(time.ticks_ms(), self._output_ended_at) >= self._duration:
                         self._occurrences += 1
                         self._reset()
                         self._start()
                 else:
                     self._occurrences = 0
+                    self._output_ended_at = None
                     self._reset()
 
             # Handle the current division
-            if self._output_started_at and not self._output_ended_at:
-                if not self._division_started_at:
-                    self._division_started_at = current_time
+            if self._output_started_at:
+                if not self._division_started_at and self._division_occurrences < self._divisions:
+                    self._division_started_at = time.ticks_ms()
 
                     if self._can_output(self._probability_per_division):
                         self.output = HIGH
-
                 else:
-                    division_running_time = time.ticks_diff(current_time, self._division_started_at)
+                    division_running_time = time.ticks_diff(time.ticks_ms(), self._division_started_at)
                     division_duration = self._get_division_duration()
                     full_division_duration = division_duration * 2
 
                     if division_duration <= division_running_time < full_division_duration:
                         self.output = LOW
                     elif division_running_time >= full_division_duration:
+                        self._division_occurrences += 1
                         self._division_started_at = None
+            else:
+                self.output = LOW
 
         if self.output != self._previous_output:
             self._previous_output = self.output
@@ -308,23 +310,6 @@ class KarmaDisplay:
 
         self._quit_settings = False
 
-        self._spaceship = framebuf.FrameBuffer(bytearray([
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x1f, 0xff,
-            0xff, 0x80, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xfc, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xfc,
-            0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xfc, 0x00, 0x00, 0x00, 0x1f, 0xff, 0xff, 0x80, 0x00, 0x00,
-            0x00, 0x1f, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x00, 0x0f, 0xf0, 0x03, 0xf8, 0x00, 0x00, 0x00,
-            0x0f, 0xf0, 0x03, 0xf8, 0x00, 0x00, 0x00, 0x0f, 0xf0, 0x01, 0xf8, 0x00, 0x00, 0x00, 0x01, 0xfe,
-            0x00, 0xff, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x00, 0xff, 0x00, 0x00, 0x03, 0xff, 0xff, 0xfc, 0xff,
-            0xc0, 0x00, 0x03, 0xff, 0xff, 0xfc, 0xff, 0xc0, 0x00, 0x00, 0x3f, 0xff, 0xff, 0xff, 0xff, 0x80,
-            0x00, 0x3f, 0xff, 0xff, 0xff, 0xff, 0x80, 0x00, 0x3f, 0xff, 0xff, 0xff, 0xff, 0x80, 0x03, 0xff,
-            0xff, 0xfc, 0xff, 0xc0, 0x00, 0x03, 0xff, 0xff, 0xfc, 0xff, 0xc0, 0x00, 0x00, 0x01, 0xfe, 0x00,
-            0xff, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x00, 0xff, 0x00, 0x00, 0x00, 0x01, 0xfe, 0x00, 0xff, 0x00,
-            0x00, 0x00, 0x0f, 0xf0, 0x03, 0xf8, 0x00, 0x00, 0x00, 0x0f, 0xf0, 0x03, 0xf8, 0x00, 0x00, 0x1f,
-            0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x1f, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff,
-            0xfc, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xfc, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xfc, 0x00,
-            0x00, 0x00, 0x1f, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x1f, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00
-        ]), 49, 32, framebuf.MONO_HLSB)
-
     def open_menu(self):
         self._is_menu_opened = True
         self._menu_last_action = time.ticks_ms()
@@ -405,62 +390,48 @@ class KarmaDisplay:
         oled.show()
 
     def _display_screensaver(self):
+        return
         self._current_state = f'{self.active_triggers},{self._triggers_sizes}'
 
         if self._current_state != self._previous_state:
             self._previous_state = self._current_state
-            enabled = False
 
             oled.fill(0)
 
             for i in range(0, 2):
                 if self.active_triggers[i]:
-                    self._triggers_sizes[i] = 32
+                    oled.arrow((10 if i == 0 else oled.width - 11), 10, oled.DIRECTION_TOP, 10)
 
-                if self._triggers_sizes[i] < oled.width:
-                    if enabled == False:
-                        oled.blit(self._spaceship, 0, 0)
 
-                    enabled = True
-                    oled.rect(self._triggers_sizes[i], (3 if i == 0 else 27), 3, 2, 1)
-
-                    accel = oled.width / 3
-
-                    if self._triggers_sizes[i] > accel:
-                        self._triggers_sizes[i] += 4
-                    elif self._triggers_sizes[i] > accel * 2:
-                        self._triggers_sizes[i] += 2
-                    else:
-                        self._triggers_sizes[i] += 1
-                '''
-                if self.active_triggers[i]:
-                    self._triggers_sizes[i] = oled.height
-
-                if self._triggers_sizes[i] > 0:
-                    oled.arrow((10 if i == 0 else oled.width - 11), self._triggers_sizes[i] - 10, oled.DIRECTION_TOP, 10)
-                    accel = oled.height / 3
-
-                    if self._triggers_sizes[i] < accel:
-                        self._triggers_sizes[i] -= 4
-                    elif self._triggers_sizes[i] < accel * 2:
-                        self._triggers_sizes[i] -= 2
-                    else:
-                        self._triggers_sizes[i] -= 1
-                '''
+            # for i in range(0, 2):
+            #     if self.active_triggers[i]:
+            #         self._triggers_sizes[i] = 32
+            #
+            #     if self.active_triggers[i]:
+            #         self._triggers_sizes[i] = oled.height
+            #
+            #     if self._triggers_sizes[i] > 0:
+            #         oled.arrow((10 if i == 0 else oled.width - 11), self._triggers_sizes[i] - 10, oled.DIRECTION_TOP, 10)
+            #         accel = oled.height / 3
+            #
+            #         if self._triggers_sizes[i] < accel:
+            #             self._triggers_sizes[i] -= 4
+            #         elif self._triggers_sizes[i] < accel * 2:
+            #             self._triggers_sizes[i] -= 2
+            #         else:
+            #             self._triggers_sizes[i] -= 1
 
             oled.show()
 
     def main(self):
         if not self._is_menu_opened:
-            # self._display_screensaver()
-            self._display_menu()
+            self._display_screensaver()
             return
 
         if ticks_diff(time.ticks_ms(), self._menu_last_action) >= self.MENU_DELAY:
             self._previous_state = 'screensaver'
             self._is_menu_opened = False
-            # self._display_screensaver()
-            self._display_menu()
+            self._display_screensaver()
             return
 
         # Check the value of k1 and k2 to change the selected setting
@@ -504,48 +475,7 @@ class Karma(EuroPiScript):
         self._ain_previous_state = LOW
 
         self._sections = [
-            [
-                KarmaOutput(
-                    cv1,
-                    KarmaOutput.BEGIN_AT_START,
-                    0,
-                    1000,
-                    1,
-                    0,
-                    100,
-                    100
-                ),
-                KarmaOutput(
-                    cv4,
-                    KarmaOutput.BEGIN_AT_START,
-                    0,
-                    1000,
-                    1,
-                    1,
-                    100,
-                    100
-                ),
-                KarmaOutput(
-                    cv3,
-                    KarmaOutput.BEGIN_AT_START,
-                    0,
-                    1000,
-                    1,
-                    0,
-                    100,
-                    100
-                ),
-                KarmaOutput(
-                    cv6,
-                    KarmaOutput.BEGIN_AT_START,
-                    0,
-                    1000,
-                    10,
-                    0,
-                    100,
-                    100
-                ),
-            ],
+            [KarmaOutput(cv1), KarmaOutput(cv4)],
             [KarmaOutput(cv3), KarmaOutput(cv6)],
         ]
 

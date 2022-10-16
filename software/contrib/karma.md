@@ -20,20 +20,20 @@ Delay, stretch, multiply, divide, and add a touch of randomness to your triggers
     output_5: Output mix of output_4 and output_6 (OR logic)
 
     knob_1: 
-      - If no setting is being edited: Nothing
+      - If no setting is being edited: Cycle through output pages
       - If a setting is being edited: Fine change the setting value
+
     knob_2: 
       - If no setting is being edited: Cycle through the settings of the selected output
       - If a setting is being edited: Change the setting value
 
     button_1:
-      - Short Press (<300ms) : Send a manual trigger/gate to trigger 1
-      - Middle Press (>300ms) : Cycle through output pages
-      - Long Press (>3000ms) : Cancel setting edit
+      - If screen is off: Switch screen on
+      - If screen is on: Cancel setting edit
 
     button_2:
-      - Short Press (<300ms) : Send a manual trigger/gate to trigger 2
-      - Middle Press (>300ms) : 
+      - If screen is off: Switch screen on
+      - If screen is on: 
         - If no setting is being edited: Select highlighted setting
         - If a setting is being edited: Save currently edited setting
 
