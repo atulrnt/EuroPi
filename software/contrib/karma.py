@@ -54,10 +54,10 @@ class KarmaOutput:
         # Runtime variables
         self.output = LOW
         self._previous_output = LOW
-        self._trigger_started_at = 0
-        self._output_started_at = 0
-        self._output_ended_at = 0
-        self._division_started_at = 0
+        self._trigger_started_at = None
+        self._output_started_at = None
+        self._output_ended_at = None
+        self._division_started_at = None
         self._occurrences = 0
 
     @property
@@ -67,7 +67,8 @@ class KarmaOutput:
     @beginning.setter
     def beginning(self, value):
         if value not in [self.BEGIN_AT_START, self.BEGIN_AT_END]:
-            raise ValueError(f"Beginning can only be set to {self.BEGIN_AT_START} or {self.BEGIN_AT_END}")
+            raise ValueError(
+                f"Beginning can only be set to {self.BEGIN_AT_START} or {self.BEGIN_AT_END}, {value} received")
 
         self._beginning = value
 
@@ -78,7 +79,7 @@ class KarmaOutput:
     @delay.setter
     def delay(self, value):
         if not isinstance(value, int) or not 0 <= value <= 10000:
-            raise ValueError(f"Delay can only be set to an integer between 0 and 10000")
+            raise ValueError(f"Delay can only be set to an integer between 0 and 10000, {value} received")
 
         self._delay = value
 
@@ -89,7 +90,7 @@ class KarmaOutput:
     @duration.setter
     def duration(self, value):
         if not isinstance(value, int) or not 10 <= value <= 10000:
-            raise ValueError(f"Duration can only be set to an integer between 10 and 10000")
+            raise ValueError(f"Duration can only be set to an integer between 10 and 10000, {value} received")
 
         self._duration = value
 
@@ -100,7 +101,7 @@ class KarmaOutput:
     @divisions.setter
     def divisions(self, value):
         if not isinstance(value, int) or not 1 <= value <= 100:
-            raise ValueError(f"Divisions can only be set to an integer between 1 and 100")
+            raise ValueError(f"Divisions can only be set to an integer between 1 and 100, {value} received")
 
         self._divisions = value
 
@@ -111,7 +112,7 @@ class KarmaOutput:
     @repetitions.setter
     def repetitions(self, value):
         if not isinstance(value, int) or not 0 <= value <= 100:
-            raise ValueError(f"Repetitions can only be set to an integer between 0 and 100")
+            raise ValueError(f"Repetitions can only be set to an integer between 0 and 100, {value} received")
 
         self._repetitions = value
 
@@ -122,7 +123,7 @@ class KarmaOutput:
     @probability.setter
     def probability(self, value):
         if not isinstance(value, int) or not 1 <= value <= 100:
-            raise ValueError(f"Probability can only be set to an integer between 1 and 100")
+            raise ValueError(f"Probability can only be set to an integer between 1 and 100, {value} received")
 
         self._probability = value
 
@@ -133,7 +134,8 @@ class KarmaOutput:
     @probability_per_division.setter
     def probability_per_division(self, value):
         if not isinstance(value, int) or not 1 <= value <= 100:
-            raise ValueError(f"Probability per division can only be set to an integer between 1 and 100")
+            raise ValueError(
+                f"Probability per division can only be set to an integer between 1 and 100, {value} received")
 
         self._probability_per_division = value
 
@@ -142,7 +144,10 @@ class KarmaOutput:
         return randint(1, 100) <= probability
 
     def _get_division_duration(self) -> float:
-        return self._duration / (self._divisions * 2)
+        if self._divisions == 1:
+            return self._duration
+
+        return self._duration / ((self._divisions * 2) + 1)
 
     def _start(self):
         if not self._can_output(self._probability):
@@ -151,11 +156,11 @@ class KarmaOutput:
         self._trigger_started_at = time.ticks_ms()
 
     def _reset(self):
-        self._trigger_started_at = 0
-        self._division_started_at = 0
         self.output = LOW
-        self._output_started_at = 0
         self._occurrences = 0
+        self._trigger_started_at = None
+        self._division_started_at = None
+        self._output_started_at = None
 
     def start(self):
         self._reset()
@@ -172,20 +177,19 @@ class KarmaOutput:
         self._start()
 
     def main(self):
-        if self._trigger_started_at == 0:
+        if not self._trigger_started_at:
             self.output = LOW
         else:
             current_time = time.ticks_ms()
-            time_since_karma_beginning = time.ticks_diff(current_time, self._trigger_started_at)
 
             # Start the output
-            if self._output_started_at == 0 and time_since_karma_beginning >= self._delay:
+            if not self._output_started_at and time.ticks_diff(current_time, self._trigger_started_at) >= self._delay:
                 self._output_started_at = current_time
 
             # End the karma run
-            elif self._output_started_at > 0 and current_time - self._output_started_at >= self._duration:
+            elif self._output_started_at and time.ticks_diff(current_time, self._output_started_at) >= self._duration:
                 if self._repetitions > 0 and self._occurrences < self._repetitions:
-                    if self._output_ended_at > 0:
+                    if self._output_ended_at:
                         self._output_ended_at = current_time
                     elif time.ticks_diff(current_time, self._output_ended_at) >= self._duration:
                         self._occurrences += 1
@@ -196,8 +200,8 @@ class KarmaOutput:
                     self._reset()
 
             # Handle the current division
-            if self._output_started_at > 0 and self._output_ended_at == 0:
-                if self._division_started_at == 0:
+            if self._output_started_at and not self._output_ended_at:
+                if not self._division_started_at:
                     self._division_started_at = current_time
 
                     if self._can_output(self._probability_per_division):
@@ -211,7 +215,7 @@ class KarmaOutput:
                     if division_duration <= division_running_time < full_division_duration:
                         self.output = LOW
                     elif division_running_time >= full_division_duration:
-                        self._division_started_at = 0
+                        self._division_started_at = None
 
         if self.output != self._previous_output:
             self._previous_output = self.output
@@ -235,7 +239,7 @@ class KarmaDisplay:
     by closing the menu after some time allows for the script to goes back to a faster run time.
     Pixels can also burn if they stay active for an extended period of time.
     """
-    MENU_DELAY = 1000
+    MENU_DELAY = 10000
 
     active_triggers = [False, False]
 
@@ -302,6 +306,8 @@ class KarmaDisplay:
         self._menu_last_action = ticks_ms()
         self._triggers_sizes = [0, 0]
 
+        self._quit_settings = False
+
         self._spaceship = framebuf.FrameBuffer(bytearray([
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00, 0x1f, 0xff,
             0xff, 0x80, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xfc, 0x00, 0x00, 0x00, 0x7f, 0xff, 0xff, 0xfc,
@@ -346,16 +352,12 @@ class KarmaDisplay:
         # If a setting is being edited: Save currently edited setting
         value = self._current_value
 
-        if self._current_page == 0:
+        if self._current_setting['name'] == 'beginning':
             value = KarmaOutput.BEGIN_AT_START if self._current_value == 'Start' else KarmaOutput.BEGIN_AT_END
 
         setattr(self._pages[self._current_page]['cv'], self._current_setting['name'], value)
 
-        self._current_setting = None
-        self._current_value = None
-
-        # Unlock the page selection knob
-        self._pages_knob.request_unlock()
+        self._quit_settings = True
 
     def _display_menu(self):
         current_page = self._pages[self._current_page]
@@ -450,13 +452,15 @@ class KarmaDisplay:
 
     def main(self):
         if not self._is_menu_opened:
-            self._display_screensaver()
+            # self._display_screensaver()
+            self._display_menu()
             return
 
         if ticks_diff(time.ticks_ms(), self._menu_last_action) >= self.MENU_DELAY:
             self._previous_state = 'screensaver'
             self._is_menu_opened = False
-            self._display_screensaver()
+            # self._display_screensaver()
+            self._display_menu()
             return
 
         # Check the value of k1 and k2 to change the selected setting
@@ -483,6 +487,14 @@ class KarmaDisplay:
             self._display_menu()
             self._previous_state = self._current_state
 
+        if self._quit_settings:
+            self._quit_settings = False
+            self._current_setting = None
+            self._current_value = None
+
+            # Unlock the page selection knob
+            self._pages_knob.request_unlock()
+
 
 class Karma(EuroPiScript):
     def __init__(self):
@@ -492,7 +504,48 @@ class Karma(EuroPiScript):
         self._ain_previous_state = LOW
 
         self._sections = [
-            [KarmaOutput(cv1), KarmaOutput(cv4)],
+            [
+                KarmaOutput(
+                    cv1,
+                    KarmaOutput.BEGIN_AT_START,
+                    0,
+                    1000,
+                    1,
+                    0,
+                    100,
+                    100
+                ),
+                KarmaOutput(
+                    cv4,
+                    KarmaOutput.BEGIN_AT_START,
+                    0,
+                    1000,
+                    1,
+                    1,
+                    100,
+                    100
+                ),
+                KarmaOutput(
+                    cv3,
+                    KarmaOutput.BEGIN_AT_START,
+                    0,
+                    1000,
+                    1,
+                    0,
+                    100,
+                    100
+                ),
+                KarmaOutput(
+                    cv6,
+                    KarmaOutput.BEGIN_AT_START,
+                    0,
+                    1000,
+                    10,
+                    0,
+                    100,
+                    100
+                ),
+            ],
             [KarmaOutput(cv3), KarmaOutput(cv6)],
         ]
 
@@ -567,13 +620,6 @@ class Karma(EuroPiScript):
 
     def main(self):
         while True:
-            section = randint(0, 1)
-
-            if randint(0, 500) < 1:
-                self.start_section(section)
-            else:
-                self.end_section(section)
-
             # Emulate din.handler and din.handler_falling for ain so that it can be used as a din2
             self._ain_current_state = HIGH if ain.percent() > 0.9 else LOW
 
@@ -606,3 +652,6 @@ class Karma(EuroPiScript):
 
 if __name__ == '__main__':
     Karma().main()
+
+
+
