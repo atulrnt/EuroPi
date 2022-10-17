@@ -43,28 +43,41 @@ Delay, stretch, multiply, divide, and add a touch of randomness to your triggers
 
 Output 1 and 4 are triggered with the digital input.  
 Output 3 and 6 are triggered with the analog input used as digital.  
-Output 2 is an OR gate of output 1 and 3.
+Output 2 is an OR gate of output 1 and 3.  
 Output 5 is a XOR gate of output 4 and 6.
+
+### Output/Menu configuration
+
+You can completely change the input/output arrangement if you want.  
+You could have 3 output linked to the 1st input, 2 output linked to the 2nd input and a single mix outputting an AND gate of the first 2 output.
+
+All this is configured in the first lines of `Karma.main()`.
+
+### Mix configuration
+
+The mixing type for the output 2 and 5 can be changed by using the different constants in the code:
+- MIX_TYPE_NONE: No mixing at all, the output will always be LOW
+- MIX_TYPE_OR: OR gate
+- MIX_TYPE_XOR: XOR gate
+- MIX_TYPE_AND: AND gate
+
+Just change the `Karma._mixers` variable to your need.
     
 ## Settings
 
-Use the Knob 1 to select a different setting to edit.  
-Use the Knob 2 to change the value of the setting to edit that you've selected with the Knob 1.
-Use the buttons to the next / previous output settings.
-
 ### Beginning
 
-The "beginning" setting define when the output starts.
+The "beginning" setting defines when the output starts.
 
 Two options are available:
 - At start: the output will be triggered as soon as the input trigger is received
-- At end; the output will be triggered once the input trigger has stopped
+- At end: the output will be triggered once the input trigger has stopped (mainly useful when the input receives a gate)
 
 **Default: At start**
 
 ### Delay
 
-The "delay" settings defines how long it should wait to output a gate once the output has been triggered.  
+The "delay" settings defines how long it should wait before starting the output once the output has been triggered (depending on the "beginning" setting).  
 The delay is set in milliseconds with a range between 0ms to 10s.
 
 **Default: 0ms**
@@ -78,7 +91,7 @@ The duration is set in milliseconds with a range between 10ms to 10s.
 
 ### Divisions
 
-The "divisions" setting defines in how many trigger/gates there should in a triggered output.
+The "divisions" setting defines in how many trigger/gates the output should be divided.
 
 For instance, if an output is set to last for 1s and to have 4 divisions, the actual output will be 4 shorter output of 125ms each separated by 4 delays of 125ms.
 1s / 4 divisions, each division having an equally long high and low state.
@@ -87,7 +100,7 @@ For instance, if an output is set to last for 1s and to have 4 divisions, the ac
 
     DIVIDED OUT: _|‾|__|‾|__|‾|__|‾|____
 
-If too many divisions are set in a short output, you might get less divisions than expected.
+If too many divisions are set in a short output, you might get unexpected results.
 
 The number of divisions can be within a range of 1 (single output) to 100 (high number of divisions only make sense in long output).
 
@@ -97,14 +110,14 @@ The number of divisions can be within a range of 1 (single output) to 100 (high 
 
 The "repetitions" setting defines how many times the output should be repeated.
 
-Each repetition will be separated by a delay as long as the output.
+Each repetition will be separated by a delay of the same length as the output.
 
-For instance, if an output is set to last for 1s and have 2 repetitions, there will be 3 similar output on the course of 5s.
+For instance, if an output is set to last for 1s and to have 2 repetitions, there will be 3 similar output on the course of 5s.
 3 output * 1s + 2 output separations * 1s.
 
-    REGULAR OUT:  _|‾‾‾|__________
+    REGULAR OUT:  _|‾‾‾|___________________
 
-    REPEATED OUT: _|‾‾‾|____|‾‾‾|_
+    REPEATED OUT: _|‾‾‾|____|‾‾‾|____|‾‾‾|_
 
 The number of repetitions can be within a range of 0 (single output without repetition) to 100 (high number of repetitions would mostly make sense for short output).
 
@@ -114,7 +127,7 @@ The divisions and the repetitions mostly differ when used with the probability s
 
 ### Probability
 
-The "probability" setting defines what are the chances for an output to happen.  
+The "probability" setting defines what are the chances for an input trigger to be noticed.  
 It's a percentage of chance between 1 and 100%.
 
 If an output is set to have some repetitions, each repetition will have its probability calculated individually.
@@ -135,7 +148,7 @@ For instance, if an output is set to have 10 divisions and have a probability pe
 
 ### Display 
 
-The display has to be "shut down" to save as much resource and avoid drifting in time when using short repetitions/divisions.  
+The display has to be put to sleep to save as much resource and avoid drifting in time when using short repetitions/divisions.
 To make it a bit more fun than just a black screen, it's displaying a random mandala instead of shutting down completely.
 
 ### Random / Probability
