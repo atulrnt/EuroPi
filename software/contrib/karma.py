@@ -2,7 +2,7 @@ from europi import *
 from time import ticks_diff, ticks_ms
 from random import randint, choice
 from europi_script import EuroPiScript
-from experimental.knobs import LockableKnob
+from experimental.knobs import LockableKnob, KnobBank
 import framebuf
 
 
@@ -77,7 +77,7 @@ class KarmaOutput(EuroPiScript):
         return self._beginning
 
     @beginning.setter
-    def beginning(self, value):
+    def beginning(self, value: int):
         if value not in [self.BEGIN_AT_START, self.BEGIN_AT_END]:
             raise ValueError(
                 f"Beginning can only be set to {self.BEGIN_AT_START} or {self.BEGIN_AT_END}, {value} received")
@@ -90,7 +90,7 @@ class KarmaOutput(EuroPiScript):
         return self._delay
 
     @delay.setter
-    def delay(self, value):
+    def delay(self, value: int):
         if not isinstance(value, int) or not 0 <= value <= 10000:
             raise ValueError(f"Delay can only be set to an integer between 0 and 10000, {value} received")
 
@@ -102,7 +102,7 @@ class KarmaOutput(EuroPiScript):
         return self._duration
 
     @duration.setter
-    def duration(self, value):
+    def duration(self, value: int):
         if not isinstance(value, int) or not 10 <= value <= 10000:
             raise ValueError(f"Duration can only be set to an integer between 10 and 10000, {value} received")
 
@@ -114,7 +114,7 @@ class KarmaOutput(EuroPiScript):
         return self._divisions
 
     @divisions.setter
-    def divisions(self, value):
+    def divisions(self, value: int):
         if not isinstance(value, int) or not 1 <= value <= 100:
             raise ValueError(f"Divisions can only be set to an integer between 1 and 100, {value} received")
 
@@ -126,7 +126,7 @@ class KarmaOutput(EuroPiScript):
         return self._repetitions
 
     @repetitions.setter
-    def repetitions(self, value):
+    def repetitions(self, value: int):
         if not isinstance(value, int) or not 0 <= value <= 100:
             raise ValueError(f"Repetitions can only be set to an integer between 0 and 100, {value} received")
 
@@ -138,7 +138,7 @@ class KarmaOutput(EuroPiScript):
         return self._probability
 
     @probability.setter
-    def probability(self, value):
+    def probability(self, value: int):
         if not isinstance(value, int) or not 1 <= value <= 100:
             raise ValueError(f"Probability can only be set to an integer between 1 and 100, {value} received")
 
@@ -150,7 +150,7 @@ class KarmaOutput(EuroPiScript):
         return self._division_probability
 
     @division_probability.setter
-    def division_probability(self, value):
+    def division_probability(self, value: int):
         if not isinstance(value, int) or not 1 <= value <= 100:
             raise ValueError(
                 f"Probability per division can only be set to an integer between 1 and 100, {value} received")
@@ -158,28 +158,36 @@ class KarmaOutput(EuroPiScript):
         self._division_probability = value
         self._save_setting('division_probability', value)
 
-    def _save_setting(self, key, value):
+    def _save_setting(self, key: str, value: int):
+        """Saves the output configuration in the global state"""
         self._state[key] = value
         self._global_state[self._id] = self._state
         self.save_state_json(self._global_state)
 
     @classmethod
     def _can_output(cls, probability: int) -> bool:
+        """Checks if the trigger can be output based on its probability setting"""
+        if probability == 100:
+            return True
+
         return randint(1, 100) <= probability
 
     def _get_division_duration(self) -> float:
+        """Returns the duration of a division based on the number of division and total output duration"""
         if self._divisions == 1:
             return self._duration
 
         return self._duration / (self._divisions * 2)
 
     def _start(self):
+        """Starts the trigger output"""
         if not self._can_output(self._probability):
             return
 
         self._trigger_started_at = time.ticks_ms()
 
     def _reset(self):
+        """Reset the output state as if it hadn't been triggered"""
         self.output = LOW
         self._trigger_started_at = None
         self._output_started_at = None
@@ -187,12 +195,14 @@ class KarmaOutput(EuroPiScript):
         self._division_occurrences = 0
 
     def start(self):
+        """An input trigger has started, triggers the output if set to begin at input start"""
         self._reset()
 
         if self._beginning == self.BEGIN_AT_START:
             self._start()
 
     def end(self):
+        """An input trigger has ended, triggers the output if set to begin at input end"""
         if self._beginning == self.BEGIN_AT_END:
             self._start()
 
@@ -204,7 +214,7 @@ class KarmaOutput(EuroPiScript):
             if not self._output_started_at and time.ticks_diff(time.ticks_ms(), self._trigger_started_at) >= self._delay:
                 self._output_started_at = time.ticks_ms()
 
-            # End the karma run
+            # End the output run
             elif self._output_started_at and time.ticks_diff(time.ticks_ms(), self._output_started_at) >= self._duration:
                 if self._repetitions > 0 and self._occurrences < self._repetitions:
                     if not self._output_ended_at:
@@ -238,6 +248,7 @@ class KarmaOutput(EuroPiScript):
             else:
                 self.output = LOW
 
+        # Change the output only if it actually changed
         if self.output != self._previous_output:
             self._previous_output = self.output
             self._cv.value(self.output)
@@ -406,8 +417,6 @@ class KarmaDisplay:
         ],
     ]
 
-    active_triggers = [False, False]
-
     def __init__(self, pages: list):
         duration_options = list(range(0, 10000, 100))
         duration_options[0] = 10
@@ -456,10 +465,9 @@ class KarmaDisplay:
             },
         ]
 
-        self._pages_knob = LockableKnob(k1, 0)
+        self._pages_knob = LockableKnob(k1, threshold_percentage=0)
         self._pages_knob.request_unlock()
-
-        self._settings_knob = LockableKnob(k2, 0)
+        self._settings_knob = LockableKnob(k2)
         self._settings_knob.request_unlock()
 
         self._pages = pages
@@ -475,10 +483,22 @@ class KarmaDisplay:
         self._menu_last_action = ticks_ms()
 
     def open_menu(self):
+        """Marks the menu as opened for the display to go/stay awake"""
         self._is_menu_opened = True
         self._menu_last_action = time.ticks_ms()
 
+    def quit_settings(self):
+        """Exits the current setting edition"""
+        self._quit_settings = False
+        self._current_setting = None
+        self._current_value = None
+
+        # Unlock the page selection and setting knobs when not editing a setting anymore
+        self._pages_knob.request_unlock()
+        self._settings_knob.request_unlock()
+
     def handle_button1(self):
+        """Handles the button 1 functionalities"""
         menu_state = self._is_menu_opened
 
         self.open_menu()
@@ -495,10 +515,13 @@ class KarmaDisplay:
         self._quit_settings = True
 
     def handle_button2(self):
+        """Handles the button 2 functionalities"""
         menu_state = self._is_menu_opened
 
         self.open_menu()
 
+        # If the menu was previously not opened (screen in sleep state),
+        # open the menu but do not select the current setting
         if not menu_state:
             return
 
@@ -510,19 +533,22 @@ class KarmaDisplay:
         # If a setting is being edited: Save currently edited setting
         value = self._current_value
 
+        # The "beginning" setting is the only one displayed as a string instead of an integer
+        # It needs to be interpreted before being saved
         if self._current_setting['name'] == 'beginning':
             value = KarmaOutput.BEGIN_AT_START if self._current_value == 'Start' else KarmaOutput.BEGIN_AT_END
 
+        # Update the setting in the selected KarmaOutput
         setattr(self._pages[self._current_page]['cv'], self._current_setting['name'], value)
 
         self._quit_settings = True
 
-    def centred_text_line(self, text, y, colour=1):
+    def centred_text_line(self, text: str, y: int, colour: int = 1):
         """Displays the given text horizontally centered on its line."""
         x_offset = int((oled.width - ((len(text) + 1) * 7)) / 2) - 1
         oled.text(text, x_offset, y, colour)
 
-    def arrow(self, x, y, direction=None, size=4, colour=1):
+    def arrow(self, x: int, y: int, direction: int = None, size: int = 4, colour: int = 1):
         """Displays an arrow of the desired size and colour pointing left, right, top or bottom.
         Use the class constants DIRECTION_LEFT, DIRECTION_RIGHT, DIRECTION_TOP and DIRECTION_BOTTOM
         to set the direction."""
@@ -540,6 +566,7 @@ class KarmaDisplay:
             oled.line(x + i, yi, x - i, yi, colour)
 
     def _display_menu(self):
+        """Displays the menu based on the current state"""
         current_page = self._pages[self._current_page]
         selected_setting = self._current_setting if self._current_setting else self._selected_setting
 
@@ -585,26 +612,26 @@ class KarmaDisplay:
         oled.show()
 
     def main(self):
+        # If the display is in sleep mode, directly exit this method to save resources
         if not self._is_menu_opened:
             return
 
+        # If no action has been performed since MENU_DELAY, switch the display in sleep mode
         if ticks_diff(time.ticks_ms(), self._menu_last_action) >= self.MENU_DELAY:
-            self._previous_state = 'wallpaper'
+            self.quit_settings()
+            self._previous_state = 'screensaver'
             self._is_menu_opened = False
+
             oled.fill(0)
             oled.blit(framebuf.FrameBuffer(bytearray(choice(self.SCREENSAVERS)), 128, 32, framebuf.MONO_HLSB), 0, 0)
             oled.show()
             return
 
+        # If the button 1 has been pressed during the edit of a setting, exit the edition without saving the value
         if self._quit_settings:
-            self._quit_settings = False
-            self._current_setting = None
-            self._current_value = None
+            self.quit_settings()
 
-            # Unlock the page selection and setting knobs when not editing a setting anymore
-            self._pages_knob.request_unlock()
-            self._settings_knob.request_unlock()
-
+        # If a setting is currently being edited
         if self._current_setting is not None:
             # Lock the page selection knob during settings edit
             if self._pages_knob.state != LockableKnob.STATE_UNLOCKED:
@@ -618,14 +645,17 @@ class KarmaDisplay:
 
             if 'fine' in self._current_setting:
                 self._current_value += k1.choice(self._current_setting['fine'])
+
+        # Only check for the setting selection every SETTING_SELECTION_CHECK_DELAY to save resources
         elif ticks_diff(ticks_ms(), self._selected_setting_last_check) > self.SETTING_SELECTION_CHECK_DELAY:
-            self._current_page = self._pages_knob.choice(list(range(0, len(self._pages))))
+            self._current_page = self._pages_knob.range(len(self._pages))
             self._selected_setting = self._settings_knob.choice(self.settings)
             self._selected_setting_last_check = ticks_ms()
 
         current_setting = self._current_setting["name"] if self._current_setting else self._selected_setting['name']
         self._current_state = f'{self._current_page},{current_setting},{self._current_value}'
 
+        # Update the display only if the state changed to save resources
         if self._current_state != self._previous_state:
             self.open_menu()
             self._display_menu()
@@ -634,6 +664,11 @@ class KarmaDisplay:
 
 class Karma(EuroPiScript):
     ANALOG_THRESHOLD = 0.9
+
+    MIX_TYPE_NONE = 0
+    MIX_TYPE_OR = 1
+    MIX_TYPE_XOR = 2
+    MIX_TYPE_AND = 3
 
     def __init__(self):
         super().__init__()
@@ -651,13 +686,13 @@ class Karma(EuroPiScript):
                 'cv': cv2,
                 'mix': self._sections[0],
                 'previous_mix': LOW,
-                'type': 'or',
+                'type': self.MIX_TYPE_OR,
             },
             {
                 'cv': cv5,
                 'mix': self._sections[1],
                 'previous_mix': LOW,
-                'type': 'xor',
+                'type': self.MIX_TYPE_XOR,
             },
         ]
 
@@ -685,14 +720,10 @@ class Karma(EuroPiScript):
             self.end_section(0)
 
     def start_section(self, section: int):
-        self._display.active_triggers[section] = True
-
         for cv in self._sections[section]:
             cv.start()
 
     def end_section(self, section: int):
-        self._display.active_triggers[section] = False
-
         for cv in self._sections[section]:
             cv.end()
 
@@ -716,10 +747,14 @@ class Karma(EuroPiScript):
 
             # Output the mix
             for mixer in self._mixers:
-                if mixer['type'] == 'or':
+                if mixer['type'] == self.MIX_TYPE_OR:
                     mix = mixer['mix'][0].output or mixer['mix'][1].output
-                else:
+                elif mixer['type'] == self.MIX_TYPE_XOR:
                     mix = mixer['mix'][0].output != mixer['mix'][1].output
+                elif mixer['type'] == self.MIX_TYPE_AND:
+                    mix = mixer['mix'][0].output and mixer['mix'][1].output
+                else:
+                    mix = LOW
 
                 if mix != mixer['previous_mix']:
                     mixer['cv'].value(mix)
@@ -730,6 +765,3 @@ class Karma(EuroPiScript):
 
 if __name__ == '__main__':
     Karma().main()
-
-
-
