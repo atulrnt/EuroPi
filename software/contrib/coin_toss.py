@@ -20,11 +20,6 @@ class CoinToss(EuroPiScript):
         self._tempo = 0
         self._deadline = 0
 
-        # Overclock the Pico for improved performance.
-        machine.freq(250_000_000)
-        # machine.freq(125_000_000)  # Default clock speed.
-
-
         @b1.handler
         def toggle_clock():
             """Toggle between internal clock and external clock from digital in."""
@@ -34,7 +29,7 @@ class CoinToss(EuroPiScript):
         def toggle_gate():
             """Toggle between gate and trigger mode."""
             self.gate_mode = not self.gate_mode
-            [o.off() for o in cvs]
+            turn_off_all_cvs()
 
     def tempo(self):
         """Read the current tempo set by k1 within set range."""
@@ -59,7 +54,7 @@ class CoinToss(EuroPiScript):
                 if din.value() != self._prev_clock:
                     # We've detected a new clock value.
                     self._prev_clock = 1 if self._prev_clock == 0 else 0
-                    # If the previous value was just set to 1 then we are seeing 
+                    # If the previous value was just set to 1 then we are seeing
                     # a high value for the first time, break wait and return.
                     if self._prev_clock == 1:
                         return
@@ -78,7 +73,7 @@ class CoinToss(EuroPiScript):
             b.value(coin > self.threshold)
         else:
             (a if coin < self.threshold else b).on()
-        
+
         if not draw:
             return
 
@@ -105,14 +100,15 @@ class CoinToss(EuroPiScript):
             if counter % 4 == 0:
                 self.toss(cv4, cv5, False)
                 cv6.on()  # Second column clock trigger (1/4x speed)
-            
+
             sleep_ms(10)
             if self.gate_mode:
                 # Only turn off clock triggers.
-                [o.off() for o in (cv3, cv6)]
+                cv3.off()
+                cv6.off()
             else:
                 # Turn of all cvs in trigger mode.
-                [o.off() for o in cvs]
+                turn_off_all_cvs()
 
             # Draw threshold line
             oled.hline(0, int(self.threshold * OLED_HEIGHT), FRAME_WIDTH, 1)

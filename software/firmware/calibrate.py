@@ -1,7 +1,8 @@
 from machine import Pin, ADC, PWM, freq
 from time import sleep
-from europi import oled, b1, b2
+from europi import oled, b1, b2, PIN_USB_CONNECTED, PIN_CV1, PIN_AIN
 from europi_script import EuroPiScript
+from os import stat, mkdir
 
 
 class Calibrate(EuroPiScript):
@@ -11,12 +12,9 @@ class Calibrate(EuroPiScript):
         return "~Calibrate"
 
     def main(self):
-        # Overclock for faster calibration
-        freq(250_000_000)
-
-        ain = ADC(Pin(26, Pin.IN, Pin.PULL_DOWN))
-        cv1 = PWM(Pin(21))
-        usb = Pin(24, Pin.IN)
+        ain = ADC(Pin(PIN_AIN, Pin.IN, Pin.PULL_DOWN))
+        cv1 = PWM(Pin(PIN_CV1))
+        usb = Pin(PIN_USB_CONNECTED, Pin.IN)
 
         def sample():
             readings = []
@@ -55,6 +53,13 @@ class Calibrate(EuroPiScript):
             while b1.value() != value:
                 sleep(0.05)
 
+        # Test if /lib exists. If not: Create it
+
+        try:
+            stat("/lib")
+        except OSError:
+            mkdir("/lib")
+
         # Calibration start
 
         if usb.value() == 1:
@@ -64,7 +69,7 @@ class Calibrate(EuroPiScript):
 
         text_wait("Calibration\nMode", 3)
 
-        oled.centre_text("Choose Process\n\n1         2")
+        oled.centre_text("Choose Process\n\n1:LOW    2:HIGH")
         while True:
             if b1.value() == 1:
                 chosen_process = 1
